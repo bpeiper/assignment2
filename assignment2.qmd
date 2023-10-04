@@ -1,0 +1,432 @@
+---
+title: "Assignment 2"
+subtitle: "Due at 11:59pm on October 3."
+format: pdf
+editor: visual
+---
+
+You may work in pairs or individually for this assignment. Make sure you join a group in Canvas if you are working in pairs. Turn in this assignment as an HTML or PDF file to ELMS. Make sure to include the R Markdown or Quarto file that was used to generate it.
+
+```{r}
+#| message = FALSE
+library(tidyverse)
+library(gtrendsR)
+library(censusapi)
+
+# Github repo link: https://github.com/bpeiper/assignment2
+```
+
+In this assignment, you will pull from APIs to get data from various data sources and use your data wrangling skills to use them all together. You should turn in a report in PDF or HTML format that addresses all of the questions in this assignment, and describes the data that you pulled and analyzed. You do not need to include full introduction and conclusion sections like a full report, but you should make sure to answer the questions in paragraph form, and include all relevant tables and graphics.
+
+Whenever possible, use piping and `dplyr`. Avoid hard-coding any numbers within the report as much as possible.
+
+## Pulling from APIs
+
+Our first data source is the Google Trends API. Suppose we are interested in the search trends for `crime` and `loans` in Illinois in the year 2020. We could find this using the following code:
+
+```{r}
+res <- gtrends(c("crime", "loans"), 
+               geo = "US-IL", 
+               time = "2020-01-01 2020-12-31", 
+               low_search_volume = TRUE)
+plot(res)
+```
+
+Answer the following questions for the keywords "crime" and "loans".
+
+-   Find the mean, median and variance of the search hits for the keywords.
+
+```{r}
+# Making the variable a little easier to use:
+
+res2 <- res$interest_over_time
+
+# Checking the variables again:
+
+summary(res2)
+
+# Finding information on the variable of interest:
+
+summary(res2$hits[res2$keyword == "crime"])
+
+summary(res2$hits[res2$keyword == "loans"])
+
+# We can see that for crime the median is 54.50 and that the mean is 53.85. For loans we see that the median is 65 and the mean is 66.37.
+
+var(res2$hits[res2$keyword == "crime"])
+
+var(res2$hits[res2$keyword == "loans"])
+
+# The variance is 78.87783 for crime and 102.6286 for loans.
+```
+
+-   Which cities (locations) have the highest search frequency for `loans`? Note that there might be multiple rows for each city if there were hits for both "crime" and "loans" in that city. It might be easier to answer this question if we had the search hits info for both search terms in two separate variables. That is, each row would represent a unique city.
+
+```{r}
+# Making the variable a little easier to use:
+
+res3 <- res$interest_by_city
+
+# Checking the variables again:
+
+summary(res3)
+
+# pivot_wider() here to seperate keywords:
+res4 <- res3 %>%
+pivot_wider(names_from = keyword, values_from = hits )
+
+rescrime <- res4$crime
+
+resloans <- res4$loans
+
+# Checking the hit break down across the non-repeating cities
+
+sort(rescrime)
+sort(resloans)
+
+# finding the top 5 cities that had the most "loans" hits
+
+res4$location[resloans>=42]
+
+# So, we find that the cities of Roodhouse, Glasford, Crainville, Justice, and Rosemont had the greatest frequency of "loans" keywords hits in Illinois. 
+
+# Out of curiosity I wanted to check which city had the most "loans" keywords hits"
+
+res4$location[resloans>=100]
+
+# They are very curious about loans in Justice.
+
+```
+
+-   Is there a relationship between the search intensities between the two keywords we used?
+
+```{r}
+
+# A good way to answer this question would be to check the correlation between the two keywords.
+
+# We'll want to repalce the NAs with 0s so the cor() function would work.
+
+res4[is.na(res4)] <- 0
+
+cor(res4$crime,res4$loans)
+
+# there is a weak negative relationship between crime search intensity and loan search intensity. So, if there is an uptick in crime search intensity there could be a small negative effect on loan search intensity and vice versa. Not a really strong looking relationship.
+```
+
+Repeat the above for keywords related to covid. Make sure you use multiple keywords like we did above. Try several different combinations and think carefully about words that might make sense within this context.
+
+Setting the new Covid keywords:
+
+```{r}
+covi <- gtrends(c("mask", "vaccine", "Fauci"), 
+               geo = "US-IL", 
+               time = "2020-01-01 2020-12-31", 
+               low_search_volume = TRUE)
+plot(covi)
+```
+
+-   Find the mean, median and variance of the search hits for the keywords.
+
+```{r}
+# Making the variable a little easier to use:
+
+covi2 <- covi$interest_over_time
+
+# Checking the variables again:
+
+summary(covi2)
+
+# Finding information on the variable of interest after turning hits into a numerical variable:
+
+covi2$hits <- as.numeric(covi2$hits)
+
+summary(covi2$hits[covi2$keyword == "mask"])
+
+summary(covi2$hits[covi2$keyword == "vaccine"])
+
+summary(covi2$hits[covi2$keyword == "Fauci"])
+
+# We can see that for mask the median is 28.50 and that the mean is 34.94. The mean being that much higher than the median suggests that the spike we saw in the graph is probably skewing the data up. For vaccine we see that the median is 9 and the mean is 12.60. There still is some skewing shown with the vaccine keyword too (caused by the spike shown in the graph near the end of the window of interest), but not quite as large as with mask. For Fauci the median was 2 and the mean ws 3.061 showing a noticably lower interest than either of the two keywords and the smallest skew effect of the three (even though there was a little interest spike around April 2020 in the graph). Broadly the medians and the means show that mask was the most searched of the three terms in this period, vaccine the second most searched, and Fauci the least. All of which is already reflected in the graph.
+
+var(covi2$hits[covi2$keyword == "mask"])
+
+var(covi2$hits[covi2$keyword == "vaccine"])
+
+var(covi2$hits[covi2$keyword == "Fauci"], na.rm = TRUE)
+
+# The variance is 449.6241 for mask, 141.1082 for vaccine, and 6.767007 for Fauci. The variances reflect what we would expect from the graph with the most big swings belonging to mask, Fauci being the most steady of the three, and vaccine being somewhere near the middle between the two (really a bit closer to Fauci than mask).
+```
+
+-   Which cities (locations) have the highest search frequency for mask, vaccine, and Fauci? Note that there might be multiple rows for each city if there were hits for more than one keyword in that city. It might be easier to answer this question if we had the search hits info for both search terms in two separate variables. That is, each row would represent a unique city.
+
+```{r}
+# Making the variable a little easier to use:
+
+covi3 <- covi$interest_by_city
+
+# Checking the variables again:
+
+summary(covi3)
+
+# pivot_wider() here to seperate keywords:
+covi4 <- covi3 %>%
+pivot_wider(names_from = keyword, values_from = hits )
+
+covimask <- covi4$mask
+
+covivaccine <- covi4$vaccine
+
+covifau <- covi4$Fauci
+
+# Checking the hit break down across the non-repeating cities
+
+sort(covimask)
+sort(covivaccine)
+sort(covifau)
+
+# finding the top 5 cities that had the most "mask" hits:
+
+covi4$location[covimask>=82]
+
+# So we find that the cities of Toluca, Divernon, Burlington, Carbon Cliff, and Shullsburg had the greatest frequency of "mask" keywords hits in Illinois.
+
+# finding the top 5 cities that had the most "vaccine" hits:
+
+covi4$location[covivaccine>=50]
+
+# So we find that the cities of Oak Lawn, Simpson, Rock Island Arsenal, Albion, and Hurst had the greatest frequency of "vaccine" keywords hits in Illinois.
+
+# finding the top 5 cities that had the most "Fauci" hits:
+
+covi4$location[covifau>=76]
+
+# So we find that the cities of Northbrook, Simpson, Winfield, Lake Bluff, and Willow Springs had the greatest frequency of "vaccine" keywords hits in Illinois.
+
+# It appears to me that there are no overlapping cities for any of the top 5 most search intensive for each keyword. 
+```
+
+-   Is there a relationship between the search intensities between the keywords used?
+
+```{r}
+
+# A good way to answer this question would be to check the correlation between the two keywords.
+
+# We'll want to repalce the NAs with 0s so the cor() function would work.
+
+covi4[is.na(covi4)] <- 0
+
+cor(covi4$mask,covi4$vaccine)
+
+cor(covi4$mask,covi4$Fauci)
+
+cor(covi4$Fauci,covi4$vaccine)
+
+# There is a weak level of correlation between all 3 variables (mask-vaccine -0.09520967, mask-Fauci -0.1343397, Fauci-vaccine 0.09654357) that hovers around -.1 for both mask connections and close to positive .1 for the Fauci vaccine correlation. I would have suspected that all of the terms would be positively correlated because they're all connected to the same general topic of the 2020 pandemic, but that appears not to be the case.
+```
+
+## Google Trends + ACS
+
+Now lets add another data set. The `censusapi` package provides a nice R interface for communicating with this API. However, before running queries we need an access key. This (easy) process can be completed here:
+
+<https://api.census.gov/data/key_signup.html>
+
+Once you have an access key, store this key in the `cs_key` object. We will use this object in all following API queries.
+
+```{r}
+#| eval: false
+
+cs_key <- "3bb61892afcdfce375ac3aebad5b72b045fe4f2a"
+```
+
+In the following, we request basic socio-demographic information (population, median age, median household income, income per capita) for cities and villages in the state of Illinois.
+
+```{r}
+#| eval: false
+
+acs_il <- getCensus(name = "acs/acs5",
+                    vintage = 2020, 
+                    vars = c("NAME", 
+                             "B01001_001E", 
+                             "B06002_001E", 
+                             "B19013_001E", 
+                             "B19301_001E"), 
+                    region = "place:*", 
+                    regionin = "state:17",
+                    key = cs_key)
+head(acs_il)
+```
+
+Convert values that represent missings to NAs.
+
+```{r}
+#| eval: false
+
+acs_il[acs_il == -666666666] <- NA
+```
+
+Now, it might be useful to rename the socio-demographic variables (`B01001_001E` etc.) in our data set and assign more meaningful names.
+
+```{r}
+#| eval: false
+acs_il <-
+  acs_il %>%
+  rename(pop = B01001_001E, 
+         age = B06002_001E, 
+         hh_income = B19013_001E, 
+         income = B19301_001E)
+```
+
+It seems like we could try to use this location information listed above to merge this data set with the Google Trends data. However, we first have to clean `NAME` so that it has the same structure as `location` in the search interest by city data. Add a new variable `location` to the ACS data that only includes city names.
+
+```{r}
+#| eval: false
+
+acs_il2 <- acs_il %>% 
+  separate(NAME, into = c("location", "state"))
+
+# I'm going to get rid of the state variable because I don't need it.
+
+acs_il2 = select(acs_il2, -3)
+
+# Checking I have all the variables I want:
+
+summary(acs_il2)
+
+# It looks good.
+```
+
+Answer the following questions with the "crime" and "loans" Google trends data and the ACS data.
+
+-   First, check how many cities don't appear in both data sets, i.e. cannot be matched. Then, create a new data set by joining the Google Trends and the ACS data. Keep only cities that appear in both data sets.
+
+```{r}
+#| eval: false
+
+# To check how many cities don't appear in both sets I'm going to check the number of non-unique cities that are present in both the Google Trends and ACS data. Which should be the difference between:
+
+length(unique(unlist(acs_il2$location,res4$location)))
+
+# And:
+
+length(acs_il2$location)
+
+# So, :
+
+length(acs_il2$location) - length(unique(unlist(acs_il2$location,res4$location)))
+
+# 207 cities are shared between the two datasets. There are 1466 cities in the ACS data and 358 cities in the Google Trends data. Therefore, there are 151 unique not matched cities in the Google data set and 1259 not matched cities in the ACS dataset. 
+
+# Next I'm going to merge the google trends data with the ACS data to create a new dataset.
+
+acsgoogle <- merge(res4,acs_il2)
+
+summary(acsgoogle)
+
+# The new merged dataset looks satisfactory.
+
+# I'll also do the same with the covid data
+
+acscovi <- merge(covi4,acs_il2)
+
+summary(acscovi)
+
+# Looks good
+```
+
+-   Compute the mean of the search popularity for both keywords for cities that have an above average median household income and for those that have an below average median household income. When building your pipe, start with creating the grouping variable and then proceed with the remaining tasks. What conclusions might you draw from this?
+
+```{r}
+#| eval: false
+
+# First I'm going to create a binary variable that reads household income as either above or below the median.
+
+# median hh_income is 55134.5
+
+median(acsgoogle$hh_income, na.rm = TRUE)
+
+acsgoogle$m_income <-acsgoogle$hh_income
+acsgoogle$m_income[acsgoogle$hh_income > 55134.5] <- "TRUE" 
+acsgoogle$m_income[acsgoogle$hh_income < 55134.5] <- "FALSE" 
+
+# Now I have a true false variable for being above and below the household income median.
+
+# Now I'm going to group by the new variable and find the mean for each of the keyword search intensities for each of the Illinois cities as requested.
+
+acsgoogle %>% group_by(acsgoogle$m_income) %>%
+  summarise(mean(crime, na.rm = 'TRUE'),
+            mean(loans, na.rm = 'TRUE'))
+
+# The results look good here and match my non-piping calculations below. We can see that the higher than median household income cities have a higher mean keyword intensity searchers for both loans and crime than the lower than median cities. This makes sense from the perspective that having higher than median household income raises the likelihood of havind a computer and being able to search anything in the first place. The crime keyword term means have a greater difference between the True and False conditions than the means for the loan keyword. Both of the FALSE condition (below median household income) are actually almost the same at a mean intensity score of about 7, but for the true condition Crime is closer to a score of 12 while Loans is closer to a score of 8. So Crime seems to be a much more popular keyword compared to Loans for people in the class of above median household income in Illinois.
+
+mean(acsgoogle$crime[acsgoogle$hh_income > 55134.5], na.rm = TRUE)
+
+# 11.60741 is the mean of cities crime search intensity that had above average household income.
+
+mean(acsgoogle$crime[acsgoogle$hh_income < 55134.5], na.rm = TRUE)
+
+# 6.985185 is the mean of cities crime search intensity that had below average household income.
+
+mean(acsgoogle$loans[acsgoogle$hh_income > 55134.5], na.rm = TRUE)
+
+# 8.2 is the mean of cities loan search intensity that had above average household income.
+
+mean(acsgoogle$loans[acsgoogle$hh_income < 55134.5], na.rm = TRUE)
+
+# 6.992593 is the mean of cities loan search intensity that had below average household income.
+
+```
+
+```{r}
+#| eval: false
+
+# I'll create the same type of median household income variable for the covid keywords dataset.
+
+median(acscovi$hh_income, na.rm = TRUE)
+
+acscovi$m_income <-acscovi$hh_income
+acscovi$m_income[acscovi$hh_income > 57500] <- "TRUE" 
+acscovi$m_income[acscovi$hh_income < 57500] <- "FALSE" 
+
+# Once again I'm going to group by the binary median household income variables and find the mean of each of the covid keyword search intensities for each of the Illinois cities.
+
+acscovi %>% group_by(acscovi$m_income) %>%
+  summarise(mean(mask, na.rm = 'TRUE'),
+            mean(vaccine, na.rm = 'TRUE'),
+            mean(Fauci, na.rm = 'TRUE'))
+
+# We can see once again that there is across all keywords a noticable increase in search intensity means in TRUE compared to FALSE. Having more money generally makes it more likely to own a computer and to then be more likely to search things. The below median income mean for the mask keyword has a much higher search intensity mean of around 21 compared to the score of around 8 for vaccine and around 4 for Fauci. The Fauci keyword has the biggest mean change from below median to above median household income for whatever reason, the score intensity goes from about 4 to 12 for an increase of about 8. That beats out mask's increase of about 3 and vaccine's increase of about 3.
+```
+
+-   Is there a relationship between the median household income and the search popularity of the Google trends terms? Describe the relationship and use a scatterplot with `qplot()`.
+
+```{r}
+#| eval: false
+
+# I want to put in two vectors in each qplot for each keyword. 
+
+# I need to find median for each city from acs for each keyword. Then I'll make a seperate scatterplot for each search term.
+
+qplot(acsgoogle$hh_income,acsgoogle$crime)
+
+# Based on this graph, if we ignore the cities that didn't have search data, it appears that there generally is a negative trend between search intensity and household income visually. However, this goes against the findings earlier which determined that the mean search intensity for crime is higher among the subset of households with higher than median income, so the mean results from earlier might have been potentially misleading. It is notable that there are many more 0s (meaning cities without search results) below the median household income which likely skewed the mean results downward.
+
+qplot(acsgoogle$hh_income,acsgoogle$loans)
+
+# Apart from one outlier at 100 and the 0s there does appear to be a rough negative relationship between household income and keyword search intensity. So potentially, if the cities with search intensity 0 were removed I could imagine that for both the loans and crime keywords that being above the median hh_income would have a smaller mean search intensity than below. 
+
+# Now to do the scatterplots for the Covid keywords
+
+qplot(acscovi$hh_income,acscovi$mask)
+
+# This scatterplot is sort of tricky to read. It looks like there might be a slight positive relationship between mask search intensity and household income which would make median household income have maybe a slight positive relationship with mask search intensity. But really it doesn't look strong at all here.
+
+qplot(acscovi$hh_income,acscovi$vaccine)
+
+# It looks like there is a slight positive relationship between household income and the vaccine keyword search intensity.
+
+qplot(acscovi$hh_income,acscovi$Fauci)
+
+# There appears to be a rough positive relationship between household income and Fauci keyword intensity. There are two past 225000 household income that sort of make that trend a little weaker though.
+```
+
+Repeat the above steps using the covid data and the ACS data. ( I included the Covid steps below each of the crime and loan steps blocks.)
