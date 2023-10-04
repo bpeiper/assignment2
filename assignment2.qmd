@@ -30,6 +30,8 @@ res <- gtrends(c("crime", "loans"),
                time = "2020-01-01 2020-12-31", 
                low_search_volume = TRUE)
 plot(res)
+
+# A lot of ups and downs there. It's difficult to pin down a simple relationship.
 ```
 
 Answer the following questions for the keywords "crime" and "loans".
@@ -123,6 +125,8 @@ covi <- gtrends(c("mask", "vaccine", "Fauci"),
                time = "2020-01-01 2020-12-31", 
                low_search_volume = TRUE)
 plot(covi)
+
+# The terms mostly seem to follow the same pattern, but with different degrees of intensity. Vaccine alone spikes up after October though.
 ```
 
 -   Find the mean, median and variance of the search hits for the keywords.
